@@ -1,9 +1,8 @@
--- Обновлённая UILib с перетаскиванием, улучшенным слайдером, биндами и стилем Gamesense
+-- Исправленная UILib (GameSense стиль, перетаскивание, бинды, обводка)
 local UILib = {}
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 
 local function create(className, properties)
     local instance = Instance.new(className)
@@ -12,6 +11,9 @@ local function create(className, properties)
     end
     return instance
 end
+
+local Window = {}
+Window.__index = Window
 
 function UILib:CreateWindow(config)
     config = config or {}
@@ -32,12 +34,7 @@ function UILib:CreateWindow(config)
         BorderSizePixel = 0,
         Parent = gui
     })
-    -- Добавляем обводку (рамку) вместо скруглений
-    local mainStroke = create("UIStroke", {
-        Thickness = 1,
-        Color = Color3.fromRGB(0, 0, 0),
-        Parent = mainFrame
-    })
+    create("UIStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = mainFrame})
 
     local topBar = create("Frame", {
         Name = "TopBar",
@@ -60,12 +57,7 @@ function UILib:CreateWindow(config)
         TextXAlignment = Enum.TextXAlignment.Left,
         Parent = topBar
     })
-    -- Обводка текста для заголовка
-    create("TextStroke", {
-        Thickness = 1,
-        Color = Color3.fromRGB(0, 0, 0),
-        Parent = titleLabel
-    })
+    create("TextStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = titleLabel})
 
     -- Перетаскивание
     local dragging = false
@@ -101,7 +93,6 @@ function UILib:CreateWindow(config)
         Parent = mainFrame
     })
     create("UIStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = tabContainer})
-
     local tabList = create("UIListLayout", {
         HorizontalAlignment = Enum.HorizontalAlignment.Center,
         SortOrder = Enum.SortOrder.LayoutOrder,
@@ -132,7 +123,11 @@ function UILib:CreateWindow(config)
         tab.frame.Visible = true
     end
 
-    function UILib:CreateTab(name, iconId)
+    local windowObject = setmetatable({}, Window)
+    windowObject.MainFrame = mainFrame
+    windowObject.Tabs = tabs
+
+    function windowObject:CreateTab(name, iconId)
         local tabFrame = create("Frame", {
             Name = name .. "Content",
             Size = UDim2.new(1, 0, 1, 0),
@@ -146,7 +141,7 @@ function UILib:CreateWindow(config)
             ScrollBarThickness = 2,
             ScrollBarImageColor3 = accent,
             BorderSizePixel = 0,
-            CanvasSize = UDim2.new(0, 0, 0, 0),
+            AutomaticCanvasSize = Enum.AutomaticSize.Y,  -- исправлено!
             Parent = tabFrame
         })
         local list = create("UIListLayout", {
@@ -205,7 +200,7 @@ function UILib:CreateWindow(config)
             create("TextStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = textOnly})
         end
 
-        local tabData = {button = tabButton, frame = tabFrame, scroll = scroll, list = list}
+        local tabData = {button = tabButton, frame = tabFrame, scroll = scroll}
         table.insert(tabs, tabData)
 
         tabButton.MouseButton1Click:Connect(function()
@@ -216,274 +211,273 @@ function UILib:CreateWindow(config)
             switchTab(tabData)
         end
 
-        return {
-            AddButton = function(self, text, callback)
-                local btn = create("TextButton", {
-                    Text = text,
-                    FontFace = Font.new(font.Name, Enum.FontWeight.SemiBold),
-                    TextSize = 14,
-                    TextColor3 = Color3.fromRGB(255, 255, 255),
-                    BackgroundColor3 = accent,
-                    BorderSizePixel = 0,
-                    Size = UDim2.new(1, -20, 0, 30),
-                    Parent = scroll
-                })
-                create("UIStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = btn})
-                create("TextStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = btn})
-                btn.MouseButton1Click:Connect(callback)
-                scroll.CanvasSize = UDim2.new(0, 0, 0, list.AbsoluteContentSize.Y)
-                return btn
-            end,
-            AddSlider = function(self, text, min, max, default, callback)
-                local frame = create("Frame", {
-                    Size = UDim2.new(1, -20, 0, 44),
-                    BackgroundTransparency = 1,
-                    BorderSizePixel = 0,
-                    Parent = scroll
-                })
-                local label = create("TextLabel", {
-                    Text = text .. ": " .. tostring(default),
+        -- Методы для вкладки
+        local tabMethods = {}
+
+        function tabMethods:AddButton(text, callback)
+            local btn = create("TextButton", {
+                Text = text,
+                FontFace = Font.new(font.Name, Enum.FontWeight.SemiBold),
+                TextSize = 14,
+                TextColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundColor3 = accent,
+                BorderSizePixel = 0,
+                Size = UDim2.new(1, -20, 0, 30),
+                Parent = scroll
+            })
+            create("UIStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = btn})
+            create("TextStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = btn})
+            btn.MouseButton1Click:Connect(callback)
+            return btn
+        end
+
+        function tabMethods:AddSlider(text, min, max, default, callback)
+            local frame = create("Frame", {
+                Size = UDim2.new(1, -20, 0, 44),
+                BackgroundTransparency = 1,
+                BorderSizePixel = 0,
+                Parent = scroll
+            })
+            local label = create("TextLabel", {
+                Text = text .. ": " .. tostring(default),
+                FontFace = Font.new(font.Name, Enum.FontWeight.Regular),
+                TextSize = 13,
+                TextColor3 = Color3.fromRGB(220, 220, 220),
+                BackgroundTransparency = 1,
+                Size = UDim2.new(1, 0, 0, 18),
+                TextXAlignment = Enum.TextXAlignment.Left,
+                Parent = frame
+            })
+            create("TextStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = label})
+
+            local sliderFrame = create("Frame", {
+                Size = UDim2.new(1, 0, 0, 4),
+                Position = UDim2.new(0, 0, 0, 24),
+                BackgroundColor3 = Color3.fromRGB(60, 60, 60),
+                BorderSizePixel = 0,
+                Parent = frame
+            })
+            create("UIStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = sliderFrame})
+
+            local fill = create("Frame", {
+                Size = UDim2.new((default - min) / (max - min), 0, 1, 0),
+                BackgroundColor3 = accent,
+                BorderSizePixel = 0,
+                Parent = sliderFrame
+            })
+            create("UIStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = fill})
+
+            local knob = create("Frame", {
+                Size = UDim2.new(0, 12, 0, 12),
+                Position = UDim2.new((default - min) / (max - min), -6, 0.5, -6),
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BorderSizePixel = 0,
+                Parent = sliderFrame
+            })
+            create("UIStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = knob})
+
+            local draggingSlider = false
+            local button = create("TextButton", {
+                Text = "",
+                Size = UDim2.new(1, 0, 0, 16),
+                Position = UDim2.new(0, 0, 0.5, -8),
+                BackgroundTransparency = 1,
+                BorderSizePixel = 0,
+                Parent = sliderFrame
+            })
+
+            button.MouseButton1Down:Connect(function()
+                draggingSlider = true
+            end)
+            UserInputService.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    draggingSlider = false
+                end
+            end)
+            UserInputService.InputChanged:Connect(function(input)
+                if draggingSlider and input.UserInputType == Enum.UserInputType.MouseMovement then
+                    local pos = math.clamp((input.Position.X - sliderFrame.AbsolutePosition.X) / sliderFrame.AbsoluteSize.X, 0, 1)
+                    local val = math.floor(min + (max - min) * pos + 0.5)
+                    fill.Size = UDim2.new(pos, 0, 1, 0)
+                    knob.Position = UDim2.new(pos, -6, 0.5, -6)
+                    label.Text = text .. ": " .. tostring(val)
+                    callback(val)
+                end
+            end)
+            return frame
+        end
+
+        function tabMethods:AddToggle(text, default, callback)
+            local frame = create("Frame", {
+                Size = UDim2.new(1, -20, 0, 30),
+                BackgroundTransparency = 1,
+                BorderSizePixel = 0,
+                Parent = scroll
+            })
+            local label = create("TextLabel", {
+                Text = text,
+                FontFace = Font.new(font.Name, Enum.FontWeight.Regular),
+                TextSize = 14,
+                TextColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 1,
+                Size = UDim2.new(1, -40, 1, 0),
+                TextXAlignment = Enum.TextXAlignment.Left,
+                Parent = frame
+            })
+            create("TextStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = label})
+
+            local toggleFrame = create("Frame", {
+                Size = UDim2.new(0, 32, 0, 18),
+                Position = UDim2.new(1, -32, 0.5, -9),
+                BackgroundColor3 = default and accent or Color3.fromRGB(80, 80, 80),
+                BorderSizePixel = 0,
+                Parent = frame
+            })
+            create("UIStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = toggleFrame})
+
+            local dot = create("Frame", {
+                Size = UDim2.new(0, 14, 0, 14),
+                Position = default and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7),
+                BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+                BorderSizePixel = 0,
+                Parent = toggleFrame
+            })
+            create("UIStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = dot})
+
+            local state = default
+            toggleFrame.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    state = not state
+                    TweenService:Create(dot, TweenInfo.new(0.15), {Position = state and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7)}):Play()
+                    toggleFrame.BackgroundColor3 = state and accent or Color3.fromRGB(80, 80, 80)
+                    callback(state)
+                end
+            end)
+            return frame
+        end
+
+        function tabMethods:AddDropdown(text, options, callback)
+            local frame = create("Frame", {
+                Size = UDim2.new(1, -20, 0, 36),
+                BackgroundTransparency = 1,
+                BorderSizePixel = 0,
+                Parent = scroll
+            })
+            local label = create("TextButton", {
+                Text = text .. ": " .. (options[1] or ""),
+                FontFace = Font.new(font.Name, Enum.FontWeight.Regular),
+                TextSize = 13,
+                TextColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundColor3 = Color3.fromRGB(35, 35, 35),
+                BorderSizePixel = 0,
+                Size = UDim2.new(1, 0, 0, 30),
+                TextXAlignment = Enum.TextXAlignment.Left,
+                Parent = frame
+            })
+            create("UIStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = label})
+            create("TextStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = label})
+
+            local expanded = false
+            local dropdownFrame = create("Frame", {
+                Size = UDim2.new(1, 0, 0, #options * 28),
+                Position = UDim2.new(0, 0, 1, 2),
+                BackgroundColor3 = Color3.fromRGB(30, 30, 30),
+                BorderSizePixel = 0,
+                Visible = false,
+                Parent = frame
+            })
+            create("UIStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = dropdownFrame})
+            local dropList = create("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder, Parent = dropdownFrame})
+            for i, option in ipairs(options) do
+                local optBtn = create("TextButton", {
+                    Text = option,
                     FontFace = Font.new(font.Name, Enum.FontWeight.Regular),
                     TextSize = 13,
                     TextColor3 = Color3.fromRGB(220, 220, 220),
-                    BackgroundTransparency = 1,
-                    Size = UDim2.new(1, 0, 0, 18),
-                    TextXAlignment = Enum.TextXAlignment.Left,
-                    Parent = frame
-                })
-                create("TextStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = label})
-
-                local sliderFrame = create("Frame", {
-                    Size = UDim2.new(1, 0, 0, 4),
-                    Position = UDim2.new(0, 0, 0, 24),
-                    BackgroundColor3 = Color3.fromRGB(60, 60, 60),
-                    BorderSizePixel = 0,
-                    Parent = frame
-                })
-                create("UIStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = sliderFrame})
-
-                local fill = create("Frame", {
-                    Size = UDim2.new((default - min) / (max - min), 0, 1, 0),
-                    BackgroundColor3 = accent,
-                    BorderSizePixel = 0,
-                    Parent = sliderFrame
-                })
-                create("UIStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = fill})
-
-                local knob = create("Frame", {
-                    Size = UDim2.new(0, 12, 0, 12),
-                    Position = UDim2.new((default - min) / (max - min), -6, 0.5, -6),
-                    BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-                    BorderSizePixel = 0,
-                    Parent = sliderFrame
-                })
-                create("UIStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = knob})
-
-                local draggingSlider = false
-                local button = create("TextButton", {
-                    Text = "",
-                    Size = UDim2.new(1, 0, 0, 16),
-                    Position = UDim2.new(0, 0, 0.5, -8),
-                    BackgroundTransparency = 1,
-                    BorderSizePixel = 0,
-                    Parent = sliderFrame
-                })
-
-                button.MouseButton1Down:Connect(function()
-                    draggingSlider = true
-                end)
-                UserInputService.InputEnded:Connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                        draggingSlider = false
-                    end
-                end)
-                UserInputService.InputChanged:Connect(function(input)
-                    if draggingSlider and input.UserInputType == Enum.UserInputType.MouseMovement then
-                        local pos = math.clamp((input.Position.X - sliderFrame.AbsolutePosition.X) / sliderFrame.AbsoluteSize.X, 0, 1)
-                        local val = math.floor(min + (max - min) * pos + 0.5)
-                        fill.Size = UDim2.new(pos, 0, 1, 0)
-                        knob.Position = UDim2.new(pos, -6, 0.5, -6)
-                        label.Text = text .. ": " .. tostring(val)
-                        callback(val)
-                    end
-                end)
-                scroll.CanvasSize = UDim2.new(0, 0, 0, list.AbsoluteContentSize.Y)
-                return frame
-            end,
-            AddToggle = function(self, text, default, callback)
-                local frame = create("Frame", {
-                    Size = UDim2.new(1, -20, 0, 30),
-                    BackgroundTransparency = 1,
-                    BorderSizePixel = 0,
-                    Parent = scroll
-                })
-                local label = create("TextLabel", {
-                    Text = text,
-                    FontFace = Font.new(font.Name, Enum.FontWeight.Regular),
-                    TextSize = 14,
-                    TextColor3 = Color3.fromRGB(255, 255, 255),
-                    BackgroundTransparency = 1,
-                    Size = UDim2.new(1, -40, 1, 0),
-                    TextXAlignment = Enum.TextXAlignment.Left,
-                    Parent = frame
-                })
-                create("TextStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = label})
-
-                local toggleFrame = create("Frame", {
-                    Size = UDim2.new(0, 32, 0, 18),
-                    Position = UDim2.new(1, -32, 0.5, -9),
-                    BackgroundColor3 = default and accent or Color3.fromRGB(80, 80, 80),
-                    BorderSizePixel = 0,
-                    Parent = frame
-                })
-                create("UIStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = toggleFrame})
-
-                local dot = create("Frame", {
-                    Size = UDim2.new(0, 14, 0, 14),
-                    Position = default and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7),
-                    BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-                    BorderSizePixel = 0,
-                    Parent = toggleFrame
-                })
-                create("UIStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = dot})
-
-                local state = default
-                toggleFrame.InputBegan:Connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                        state = not state
-                        TweenService:Create(dot, TweenInfo.new(0.15), {Position = state and UDim2.new(1, -16, 0.5, -7) or UDim2.new(0, 2, 0.5, -7)}):Play()
-                        toggleFrame.BackgroundColor3 = state and accent or Color3.fromRGB(80, 80, 80)
-                        callback(state)
-                    end
-                end)
-                scroll.CanvasSize = UDim2.new(0, 0, 0, list.AbsoluteContentSize.Y)
-                return frame
-            end,
-            AddDropdown = function(self, text, options, callback)
-                local frame = create("Frame", {
-                    Size = UDim2.new(1, -20, 0, 36),
-                    BackgroundTransparency = 1,
-                    BorderSizePixel = 0,
-                    Parent = scroll
-                })
-                local label = create("TextButton", {
-                    Text = text .. ": " .. (options[1] or ""),
-                    FontFace = Font.new(font.Name, Enum.FontWeight.Regular),
-                    TextSize = 13,
-                    TextColor3 = Color3.fromRGB(255, 255, 255),
-                    BackgroundColor3 = Color3.fromRGB(35, 35, 35),
-                    BorderSizePixel = 0,
-                    Size = UDim2.new(1, 0, 0, 30),
-                    TextXAlignment = Enum.TextXAlignment.Left,
-                    Parent = frame
-                })
-                create("UIStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = label})
-                create("TextStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = label})
-
-                local expanded = false
-                local dropdownFrame = create("Frame", {
-                    Size = UDim2.new(1, 0, 0, #options * 28),
-                    Position = UDim2.new(0, 0, 1, 2),
                     BackgroundColor3 = Color3.fromRGB(30, 30, 30),
                     BorderSizePixel = 0,
-                    Visible = false,
-                    Parent = frame
+                    Size = UDim2.new(1, 0, 0, 28),
+                    Parent = dropdownFrame
                 })
-                create("UIStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = dropdownFrame})
-
-                local dropList = create("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder, Parent = dropdownFrame})
-                for i, option in ipairs(options) do
-                    local optBtn = create("TextButton", {
-                        Text = option,
-                        FontFace = Font.new(font.Name, Enum.FontWeight.Regular),
-                        TextSize = 13,
-                        TextColor3 = Color3.fromRGB(220, 220, 220),
-                        BackgroundColor3 = Color3.fromRGB(30, 30, 30),
-                        BorderSizePixel = 0,
-                        Size = UDim2.new(1, 0, 0, 28),
-                        Parent = dropdownFrame
-                    })
-                    create("UIStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = optBtn})
-                    create("TextStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = optBtn})
-                    optBtn.MouseButton1Click:Connect(function()
-                        label.Text = text .. ": " .. option
-                        dropdownFrame.Visible = false
-                        expanded = false
-                        callback(option)
-                    end)
-                end
-                label.MouseButton1Click:Connect(function()
-                    expanded = not expanded
-                    dropdownFrame.Visible = expanded
+                create("UIStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = optBtn})
+                create("TextStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = optBtn})
+                optBtn.MouseButton1Click:Connect(function()
+                    label.Text = text .. ": " .. option
+                    dropdownFrame.Visible = false
+                    expanded = false
+                    callback(option)
                 end)
-                scroll.CanvasSize = UDim2.new(0, 0, 0, list.AbsoluteContentSize.Y)
-                return frame
-            end,
-            AddBind = function(self, text, defaultKey, callback)
-                -- defaultKey: Enum.KeyCode или nil
-                local frame = create("Frame", {
-                    Size = UDim2.new(1, -20, 0, 30),
-                    BackgroundTransparency = 1,
-                    BorderSizePixel = 0,
-                    Parent = scroll
-                })
-                local label = create("TextLabel", {
-                    Text = text,
-                    FontFace = Font.new(font.Name, Enum.FontWeight.Regular),
-                    TextSize = 14,
-                    TextColor3 = Color3.fromRGB(255, 255, 255),
-                    BackgroundTransparency = 1,
-                    Size = UDim2.new(0, 100, 1, 0),
-                    TextXAlignment = Enum.TextXAlignment.Left,
-                    Parent = frame
-                })
-                create("TextStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = label})
+            end
+            label.MouseButton1Click:Connect(function()
+                expanded = not expanded
+                dropdownFrame.Visible = expanded
+            end)
+            return frame
+        end
 
-                local bindButton = create("TextButton", {
-                    Text = defaultKey and "[" .. defaultKey.Name .. "]" or "[None]",
-                    FontFace = Font.new(font.Name, Enum.FontWeight.SemiBold),
-                    TextSize = 13,
-                    TextColor3 = Color3.fromRGB(255, 255, 255),
-                    BackgroundColor3 = Color3.fromRGB(35, 35, 35),
-                    BorderSizePixel = 0,
-                    Size = UDim2.new(0, 90, 1, 0),
-                    Position = UDim2.new(1, -90, 0, 0),
-                    TextXAlignment = Enum.TextXAlignment.Center,
-                    Parent = frame
-                })
-                create("UIStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = bindButton})
-                create("TextStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = bindButton})
+        function tabMethods:AddBind(text, defaultKey, callback)
+            local frame = create("Frame", {
+                Size = UDim2.new(1, -20, 0, 30),
+                BackgroundTransparency = 1,
+                BorderSizePixel = 0,
+                Parent = scroll
+            })
+            local label = create("TextLabel", {
+                Text = text,
+                FontFace = Font.new(font.Name, Enum.FontWeight.Regular),
+                TextSize = 14,
+                TextColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundTransparency = 1,
+                Size = UDim2.new(0, 100, 1, 0),
+                TextXAlignment = Enum.TextXAlignment.Left,
+                Parent = frame
+            })
+            create("TextStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = label})
 
-                local currentKey = defaultKey
-                local waiting = false
+            local bindButton = create("TextButton", {
+                Text = defaultKey and "[" .. defaultKey.Name .. "]" or "[None]",
+                FontFace = Font.new(font.Name, Enum.FontWeight.SemiBold),
+                TextSize = 13,
+                TextColor3 = Color3.fromRGB(255, 255, 255),
+                BackgroundColor3 = Color3.fromRGB(35, 35, 35),
+                BorderSizePixel = 0,
+                Size = UDim2.new(0, 90, 1, 0),
+                Position = UDim2.new(1, -90, 0, 0),
+                TextXAlignment = Enum.TextXAlignment.Center,
+                Parent = frame
+            })
+            create("UIStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = bindButton})
+            create("TextStroke", {Thickness = 1, Color = Color3.fromRGB(0, 0, 0), Parent = bindButton})
 
-                bindButton.MouseButton1Click:Connect(function()
-                    waiting = true
-                    bindButton.Text = "[...]"
-                end)
+            local currentKey = defaultKey
+            local waiting = false
 
-                local conn
-                conn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-                    if waiting and not gameProcessed then
-                        if input.UserInputType == Enum.UserInputType.Keyboard then
-                            currentKey = input.KeyCode
-                            bindButton.Text = "[" .. currentKey.Name .. "]"
-                            callback(currentKey)
-                            waiting = false
-                        elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
-                            -- если кликнули мимо, можно отменить или оставить; отменяем
-                            waiting = false
-                            bindButton.Text = currentKey and "[" .. currentKey.Name .. "]" or "[None]"
-                        end
+            bindButton.MouseButton1Click:Connect(function()
+                waiting = true
+                bindButton.Text = "[...]"
+            end)
+
+            local conn
+            conn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+                if waiting and not gameProcessed then
+                    if input.UserInputType == Enum.UserInputType.Keyboard then
+                        currentKey = input.KeyCode
+                        bindButton.Text = "[" .. currentKey.Name .. "]"
+                        callback(currentKey)
+                        waiting = false
+                    elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+                        waiting = false
+                        bindButton.Text = currentKey and "[" .. currentKey.Name .. "]" or "[None]"
                     end
-                end)
-                scroll.CanvasSize = UDim2.new(0, 0, 0, list.AbsoluteContentSize.Y)
-                return frame
-            end,
-        }
+                end
+            end)
+            return frame
+        end
+
+        return tabMethods
     end
 
-    -- Insert hotkey toggle
+    -- Горячая клавиша Insert
     UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
         if input.KeyCode == Enum.KeyCode.Insert then
@@ -491,7 +485,7 @@ function UILib:CreateWindow(config)
         end
     end)
 
-    return UILib
+    return windowObject
 end
 
 return UILib
